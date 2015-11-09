@@ -1,0 +1,27 @@
+my native CLong is Int is export where ni $_, nqp::const::C_TYPE_LONG;
+my native CLLong is Int is export where ni $_, nqp::const::C_TYPE_LONGLONG;
+
+my native cuchar is Int is export where nu $_, nqp::const::C_TYPE_CHAR;
+my native cushort is Int is export where nu $_, nqp::const::C_TYPE_SHORT;
+my native CUInt is Int is export where nu $_, nqp::const::C_TYPE_INT;
+my native CULong is Int is export where nu $_, nqp::const::C_TYPE_LONG;
+my native CULLong is Int is export where nu $_, nqp::const::C_TYPE_LONGLONG;
+
+my native CInt8 is Int is export where ni $_, 8;
+my native CInt16 is Int is export where ni $_, 16;
+my native CInt32 is Int is export where ni $_, 32;
+my native CInt64 is Int is export where ni $_, 64;
+my native CInt128 is Int is export where ni $_, 128;
+
+my native CUInt8 is Int is export where nu $_, 8;
+my native CUInt16 is Int is export where nu $_, 16;
+my native CUInt32 is Int is export where nu $_, 32;
+my native CUInt64 is Int is export where nu $_, 64;
+my native CUInt128 is Int is export where nu $_, 128;
+
+my native CFloat is Num is export where nn $_, nqp::const::C_TYPE_FLOAT;
+my native CDouble is Num is export where nn $_, nqp::const::C_TYPE_DOUBLE;
+my native CLDouble is Num is export where nn $_, nqp::const::C_TYPE_LONGDOUBLE;
+
+my native CNum32 is Num is export where nn $_, 32;
+my native CNum64 is Num is export where nn $_, 64;
