@@ -1,7 +1,6 @@
 use v6;
 use nqp;
 
-my constant NativeHOW = int.HOW.WHAT; # HACK
 my constant CHAR_BIT = 8;
 
 my class Callsite is repr<NativeCall> {}
@@ -39,18 +38,18 @@ my constant NUMMAP = Map.new(
         my native double is repr<P6num> is ctype<double> {},
         my native float is repr<P6num> is ctype<float> {});
 
-my constant &ni = sub check-native-int($_, $size) {
-    .HOW.WHAT =:= NativeHOW && .HOW.nativesize($_) == $size
+sub ni($_, $size) {
+    .HOW.WHAT =:= int.HOW.WHAT && .HOW.nativesize($_) == $size
         && !.HOW.unsigned($_);
 }
 
-my constant &nu = sub check-native-uint($_, $size) {
-    .HOW.WHAT =:= NativeHOW && .HOW.nativesize($_) == $size
+sub nu($_, $size) {
+    .HOW.WHAT =:= int.HOW.WHAT && .HOW.nativesize($_) == $size
         && ?.HOW.unsigned($_);
 }
 
-my constant &nn = sub check-native-num($_, $size) {
-    .HOW.WHAT =:= NativeHOW && .HOW.nativesize($_) == $size;
+sub nn($_, $size) {
+    .HOW.WHAT =:= int.HOW.WHAT && .HOW.nativesize($_) == $size;
 }
 
 my subset CChar of Int is export where ni $_, nqp::const::C_TYPE_CHAR;
