@@ -83,9 +83,9 @@ my subset CFloat of Num is export where nn $_, nqp::const::C_TYPE_FLOAT;
 my subset CDouble of Num is export where nn $_, nqp::const::C_TYPE_DOUBLE;
 my subset CLDouble of Num is export where nn $_, nqp::const::C_TYPE_LONGDOUBLE;
 
-my subset CNum32 of Num is export where nn $_, 32;
-my subset CNum64 of Num is export where nn $_, 64;
-my subset CNumX of Num is export where nn $_, 0;
+my subset CFloat32 of Num is export where nn $_, 32;
+my subset CFloat64 of Num is export where nn $_, 64;
+my subset CFloatX of Num is export where nn $_, 0;
 
 my subset CPointer of Mu is export where .REPR eq 'CPointer';
 my subset CArray of Mu is export where .REPR eq 'CArray';
@@ -127,10 +127,10 @@ multi ctypeof(CFloat) { 'float' }
 multi ctypeof(CDouble) { 'double' }
 multi ctypeof(CLDouble) { 'longdouble' }
 
-multi ctypeof(CNum32) { BEGIN NUMMAP<32> // Str }
-multi ctypeof(CNum64) { BEGIN NUMMAP<64> // Str }
+multi ctypeof(CFloat32) { BEGIN NUMMAP<32> // Str }
+multi ctypeof(CFloat64) { BEGIN NUMMAP<64> // Str }
 
-multi ctypeof(CNumX $_) {
+multi ctypeof(CFloatX $_) {
     NUMMAP{ CHAR_BIT * nqp::nativecallsizeof($_) } // Str;
 }
 
@@ -173,7 +173,7 @@ multi cbind(Str $name, Signature $sig, Str :$lib) {
         $name,
         '', # calling convention
         $argtypes,
-        nqp::hash('type', ctypeof($sig.returns)),
+        nqp::hash('type', ctypeof($sig.returns) // 'void'),
     );
 
     sub (|args) {
@@ -309,6 +309,7 @@ my role FloatingArray[Mu:U \T] does RawArray[T] {
     method ASSIGN-POS(uint \pos, \value) { nqp::bindpos_n(self, pos, value) }
 }
 
+
 my native cchar is Int is ctype<char> is repr<P6int> is export {}
 my class CCharArray is repr<CArray> is array_type(cchar)
     does IntegerArray[cchar] {}
@@ -323,3 +324,125 @@ my native cint is Int is ctype<int> is repr<P6int> is export {}
 my class CIntArray is repr<CArray> is array_type(cint)
     does IntegerArray[cint] {}
 multi carraytype(CInt) { CIntArray }
+
+my native clong is Int is ctype<long> is repr<P6int> is export {}
+my class CLongArray is repr<CArray> is array_type(clong)
+    does IntegerArray[clong] {}
+multi carraytype(CLong) { CLongArray }
+
+my native cllong is Int is ctype<longlong> is repr<P6int> is export {}
+my class CLLongArray is repr<CArray> is array_type(cllong)
+    does IntegerArray[cllong] {}
+multi carraytype(CLLong) { CLLongArray }
+
+
+my native cuchar is Int is ctype<char> is unsigned is repr<P6int> is export {}
+my class CUCharArray is repr<CArray> is array_type(cuchar)
+    does IntegerArray[cuchar] {}
+multi carraytype(CUChar) { CUCharArray }
+
+my native cushort is Int is ctype<short> is unsigned is repr<P6int> is export {}
+my class CUShortArray is repr<CArray> is array_type(cushort)
+    does IntegerArray[cushort] {}
+multi carraytype(CUShort) { CUShortArray }
+
+my native cuint is Int is ctype<int> is unsigned is repr<P6int> is export {}
+my class CUIntArray is repr<CArray> is array_type(cuint)
+    does IntegerArray[cuint] {}
+multi carraytype(CUInt) { CUIntArray }
+
+my native culong is Int is ctype<long> is unsigned is repr<P6int> is export {}
+my class CULongArray is repr<CArray> is array_type(culong)
+    does IntegerArray[clong] {}
+multi carraytype(CULong) { CULongArray }
+
+my native cullong is Int is ctype<longlong> is unsigned is repr<P6int>
+    is export {}
+my class CULLongArray is repr<CArray> is array_type(cullong)
+    does IntegerArray[cullong] {}
+multi carraytype(CULLong) { CULLongArray }
+
+
+my native cint8 is Int is ctype(INTMAP<8>) is repr<P6int> is export {}
+my class CInt8Array is repr<CArray> is array_type(cint8)
+    does IntegerArray[cint8] {}
+multi carraytype(CInt8) { CInt8Array }
+
+my native cint16 is Int is ctype(INTMAP<16>) is repr<P6int> is export {}
+my class CInt16Array is repr<CArray> is array_type(cint16)
+    does IntegerArray[cint16] {}
+multi carraytype(CInt16) { CInt16Array }
+
+my native cint32 is Int is ctype(INTMAP<32>) is repr<P6int> is export {}
+my class CInt32Array is repr<CArray> is array_type(cint32)
+    does IntegerArray[cint32] {}
+multi carraytype(CInt32) { CInt32Array }
+
+my native cint64 is Int is ctype(INTMAP<64>) is repr<P6int> is export {}
+my class CInt64Array is repr<CArray> is array_type(cint64)
+    does IntegerArray[cint64] {}
+multi carraytype(CInt64) { CInt64Array }
+
+# my native cint128 is Int is ctype(INTMAP<128>) is repr<P6int> is export {}
+# my class CInt128Array is repr<CArray> is array_type(cint128)
+#     does IntegerArray[cint128] {}
+# multi carraytype(CInt128) { CInt128Array }
+
+
+my native cuint8 is Int is ctype(INTMAP<8>) is unsigned is repr<P6int>
+    is export {}
+my class CUInt8Array is repr<CArray> is array_type(cuint8)
+    does IntegerArray[cuint8] {}
+multi carraytype(CUInt8) { CUInt8Array }
+
+my native cuint16 is Int is ctype(INTMAP<16>) is unsigned is repr<P6int>
+    is export {}
+my class CUInt16Array is repr<CArray> is array_type(cuint16)
+    does IntegerArray[cuint16] {}
+multi carraytype(CUInt16) { CUInt16Array }
+
+my native cuint32 is Int is ctype(INTMAP<32>) is unsigned is repr<P6int>
+    is export {}
+my class CUInt32Array is repr<CArray> is array_type(cuint32)
+    does IntegerArray[cuint32] {}
+multi carraytype(CUInt32) { CUInt32Array }
+
+my native cuint64 is Int is ctype(INTMAP<64>) is unsigned is repr<P6int>
+    is export {}
+my class CUInt64Array is repr<CArray> is array_type(cuint64)
+    does IntegerArray[cuint64] {}
+multi carraytype(CUInt64) { CUInt64Array }
+
+# my native cuint128 is Int is ctype(INTMAP<128>) is unsigned is repr<P6int>
+#     is export {}
+# my class CUInt128Array is repr<CArray> is array_type(cuint128)
+#     does IntegerArray[cuint128] {}
+# multi carraytype(CUInt128) { CUInt128Array }
+
+
+my native cfloat is Num is ctype<float> is repr<P6num> is export {}
+my class CFloatArray is repr<CArray> is array_type(cfloat)
+    does FloatingArray[cfloat] {}
+multi carraytype(CFloat) { CFloatArray }
+
+my native cdouble is Num is ctype<double>  is repr<P6num> is export {}
+my class CDoubleArray is repr<CArray> is array_type(cdouble)
+    does FloatingArray[cdouble] {}
+multi carraytype(CDouble) { CDoubleArray }
+
+# my native cldouble is Num is ctype<longdouble>  is repr<P6num>
+#     is export {}
+# my class CLDoubleArray is repr<CArray> is array_type(cldouble)
+#     does FloatingArray[cldouble] {}
+# multi carraytype(CLDouble) { CLDoubleArray }
+
+
+my native cfloat32 is Num is ctype(NUMMAP<32>) is repr<P6num> is export {}
+my class CFloat32Array is repr<CArray> is array_type(cfloat32)
+    does FloatingArray[cfloat32] {}
+multi carraytype(CFloat32) { CFloat32Array }
+
+my native cfloat64 is Num is ctype(NUMMAP<64>) is repr<P6num> is export {}
+my class CFloat64Array is repr<CArray> is array_type(cfloat64)
+    does FloatingArray[cfloat64] {}
+multi carraytype(CFloat64) { CFloat64Array }
