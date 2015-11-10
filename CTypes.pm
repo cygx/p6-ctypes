@@ -272,10 +272,10 @@ my class ScalarRef {
     }
 }
 
-my role BoxedArray[Mu:U \T, UInt \elems] does Positional[T] {
+my role BoxedArray[::T, UInt \elems] does Positional[T] {
     has $.raw handles <AT-POS ASSIGN-POS>;
 
-    method CT-SIZEOF { self.elems * csizeof(T) }
+    method CT-SIZEOF { self.elems * csizeof(nqp::decont(T)) }
     method CT-TYPEOF { 'carray' }
     method CT-UNBOX { $!raw }
 
@@ -294,16 +294,16 @@ my role BoxedArray[Mu:U \T, UInt \elems] does Positional[T] {
     }
 }
 
-my role RawArray[Mu:U \T] {
+my role RawArray[::T] {
     method box($raw: uint $elems) { BoxedArray[T, $elems].new(:$raw) }
 }
 
-my role IntegerArray[Mu:U \T] does RawArray[T] {
+my role IntegerArray[::T] does RawArray[T] {
     method AT-POS(uint \pos) { nqp::atpos_i(self, pos) }
     method ASSIGN-POS(uint \pos, \value) { nqp::bindpos_i(self, pos, value) }
 }
 
-my role FloatingArray[Mu:U \T] does RawArray[T] {
+my role FloatingArray[::T] does RawArray[T] {
     method AT-POS(uint \pos) { nqp::atpos_n(self, pos) }
     method ASSIGN-POS(uint \pos, \value) { nqp::bindpos_n(self, pos, value) }
 }
