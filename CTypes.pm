@@ -23,6 +23,12 @@ proto cbind(Str $name, Signature $sig, *%) is export {*}
 proto cinvoke(Str $name, Signature $sig, *@, *%) is export {*}
 
 my constant PTRSIZE = nqp::nativecallsizeof(VMPtr);
+my constant PTRBITS = CHAR_BIT * PTRSIZE;
+
+my native cintptr is Int is nativesize(PTRBITS) is repr<P6int> is export {}
+my native cuintptr is Int is nativesize(PTRBITS) is unsigned is repr<P6int>
+    is export {}
+# -- no need to define array types: dispatches to fixed-sized types
 
 my constant INTMAP = Map.new(
     map { CHAR_BIT * nqp::nativecallsizeof($_) => .HOW.name($_) },
@@ -69,6 +75,7 @@ my subset CInt16 of Int is export where ni $_, 16;
 my subset CInt32 of Int is export where ni $_, 32;
 my subset CInt64 of Int is export where ni $_, 64;
 my subset CInt128 of Int is export where ni $_, 128;
+my subset CIntPtr of Int is export where ni $_, PTRBITS;
 my subset CIntX of Int is export where ni $_, 0;
 
 my subset CUInt8 of Int is export where nu $_, 8;
@@ -76,6 +83,7 @@ my subset CUInt16 of Int is export where nu $_, 16;
 my subset CUInt32 of Int is export where nu $_, 32;
 my subset CUInt64 of Int is export where nu $_, 64;
 my subset CUInt128 of Int is export where nu $_, 128;
+my subset CUIntPtr of Int is export where nu $_, PTRBITS;
 my subset CUIntX of Int is export where nu $_, 0;
 
 my subset CFloat of Num is export where nn $_, nqp::const::C_TYPE_FLOAT;
@@ -107,6 +115,8 @@ multi ctypeof(CInt16) { BEGIN INTMAP<16> // Str }
 multi ctypeof(CInt32) { BEGIN INTMAP<32> // Str }
 multi ctypeof(CInt64) { BEGIN INTMAP<64> // Str }
 multi ctypeof(CInt128) { BEGIN INTMAP<128> // Str }
+# -- dispatches to fixed-sized types
+# multi ctypeof(CIntPtr) { BEGIN INTMAP{PTRBITS} // Str }
 
 multi ctypeof(CIntX $_) {
     INTMAP{ CHAR_BIT * nqp::nativecallsizeof($_) } // Str;
@@ -117,6 +127,8 @@ multi ctypeof(CUInt16) { BEGIN INTMAP<16> // Str andthen "u$_" }
 multi ctypeof(CUInt32) { BEGIN INTMAP<32> // Str andthen "u$_" }
 multi ctypeof(CUInt64) { BEGIN INTMAP<64> // Str andthen "u$_" }
 multi ctypeof(CUInt128) { BEGIN INTMAP<128> // Str andthen "u$_" }
+# -- dispatches to fixed-sized types
+# multi ctypeof(CUIntPtr) { BEGIN INTMAP{PTRBITS} // Str andthen "u$_" }
 
 multi ctypeof(CUIntX $_) {
     (INTMAP{ CHAR_BIT * nqp::nativecallsizeof($_) } // Str) andthen "u$_";
@@ -213,8 +225,8 @@ my role CPtr[::T = Void] is export {
 
     method rv {
         given ~T.REPR {
-            when 'CPointer' { # FIXME: use uintptr!
-                nqp::box_i(self.to(uint64).rv, T);
+            when 'CPointer' {
+                nqp::box_i(self.to(cuintptr).rv, T);
             }
 
             when 'P6int' {
@@ -362,57 +374,57 @@ my class CULLongArray is repr<CArray> is array_type(cullong)
 multi carraytype(CULLong) { CULLongArray }
 
 
-my native cint8 is Int is ctype(INTMAP<8>) is repr<P6int> is export {}
+my native cint8 is Int is nativesize(8) is repr<P6int> is export {}
 my class CInt8Array is repr<CArray> is array_type(cint8)
     does IntegerArray[cint8] {}
 multi carraytype(CInt8) { CInt8Array }
 
-my native cint16 is Int is ctype(INTMAP<16>) is repr<P6int> is export {}
+my native cint16 is Int is nativesize(16) is repr<P6int> is export {}
 my class CInt16Array is repr<CArray> is array_type(cint16)
     does IntegerArray[cint16] {}
 multi carraytype(CInt16) { CInt16Array }
 
-my native cint32 is Int is ctype(INTMAP<32>) is repr<P6int> is export {}
+my native cint32 is Int is nativesize(32) is repr<P6int> is export {}
 my class CInt32Array is repr<CArray> is array_type(cint32)
     does IntegerArray[cint32] {}
 multi carraytype(CInt32) { CInt32Array }
 
-my native cint64 is Int is ctype(INTMAP<64>) is repr<P6int> is export {}
+my native cint64 is Int is nativesize(64) is repr<P6int> is export {}
 my class CInt64Array is repr<CArray> is array_type(cint64)
     does IntegerArray[cint64] {}
 multi carraytype(CInt64) { CInt64Array }
 
-# my native cint128 is Int is ctype(INTMAP<128>) is repr<P6int> is export {}
+# my native cint128 is Int is nativesize(128) is repr<P6int> is export {}
 # my class CInt128Array is repr<CArray> is array_type(cint128)
 #     does IntegerArray[cint128] {}
 # multi carraytype(CInt128) { CInt128Array }
 
 
-my native cuint8 is Int is ctype(INTMAP<8>) is unsigned is repr<P6int>
+my native cuint8 is Int is nativesize(8) is unsigned is repr<P6int>
     is export {}
 my class CUInt8Array is repr<CArray> is array_type(cuint8)
     does IntegerArray[cuint8] {}
 multi carraytype(CUInt8) { CUInt8Array }
 
-my native cuint16 is Int is ctype(INTMAP<16>) is unsigned is repr<P6int>
+my native cuint16 is Int is nativesize(16) is unsigned is repr<P6int>
     is export {}
 my class CUInt16Array is repr<CArray> is array_type(cuint16)
     does IntegerArray[cuint16] {}
 multi carraytype(CUInt16) { CUInt16Array }
 
-my native cuint32 is Int is ctype(INTMAP<32>) is unsigned is repr<P6int>
+my native cuint32 is Int is nativesize(32) is unsigned is repr<P6int>
     is export {}
 my class CUInt32Array is repr<CArray> is array_type(cuint32)
     does IntegerArray[cuint32] {}
 multi carraytype(CUInt32) { CUInt32Array }
 
-my native cuint64 is Int is ctype(INTMAP<64>) is unsigned is repr<P6int>
+my native cuint64 is Int is nativesize(64) is unsigned is repr<P6int>
     is export {}
 my class CUInt64Array is repr<CArray> is array_type(cuint64)
     does IntegerArray[cuint64] {}
 multi carraytype(CUInt64) { CUInt64Array }
 
-# my native cuint128 is Int is ctype(INTMAP<128>) is unsigned is repr<P6int>
+# my native cuint128 is Int is nativesize(128) is unsigned is repr<P6int>
 #     is export {}
 # my class CUInt128Array is repr<CArray> is array_type(cuint128)
 #     does IntegerArray[cuint128] {}
@@ -436,12 +448,12 @@ multi carraytype(CDouble) { CDoubleArray }
 # multi carraytype(CLDouble) { CLDoubleArray }
 
 
-my native cfloat32 is Num is ctype(NUMMAP<32>) is repr<P6num> is export {}
+my native cfloat32 is Num is nativesize(32) is repr<P6num> is export {}
 my class CFloat32Array is repr<CArray> is array_type(cfloat32)
     does FloatingArray[cfloat32] {}
 multi carraytype(CFloat32) { CFloat32Array }
 
-my native cfloat64 is Num is ctype(NUMMAP<64>) is repr<P6num> is export {}
+my native cfloat64 is Num is nativesize(64) is repr<P6num> is export {}
 my class CFloat64Array is repr<CArray> is array_type(cfloat64)
     does FloatingArray[cfloat64] {}
 multi carraytype(CFloat64) { CFloat64Array }
