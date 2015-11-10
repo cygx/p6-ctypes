@@ -459,3 +459,14 @@ my native cfloat64 is Num is nativesize(64) is repr<P6num> is export {}
 my class CFloat64Array is repr<CArray> is array_type(cfloat64)
     does FloatingArray[cfloat64] {}
 multi carraytype(CFloat64) { CFloat64Array }
+
+# -- preliminary helper functions
+# -- likely to change with future revisions
+
+sub cstrarray(*@values, :$enc = 'utf8', :$stage) is export {
+    Blob[cuintptr].new(|@values.map({
+        my $blob := "$_\0".encode($enc);
+        .push($blob) with $stage;
+        VMPtr.from($blob)
+    }), 0);
+}
