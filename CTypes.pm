@@ -4,12 +4,12 @@ use nqp;
 my constant CHAR_BIT = 8;
 
 my class Callsite is repr<NativeCall> {}
-my class Void is repr<Uninstantiable> {}
+my class void is repr<Uninstantiable> {}
 my class ScalarRef { ... }
 my class VMPtr is repr<CPointer> {
-    method new(Int() \address) { nqp::box_i(address, self) }
-    method from(\obj) { nqp::nativecallcast(VMPtr, VMPtr, nqp::decont(obj)) }
-    method gist { "\&*{ nqp::unbox_i(self) }" }
+    method new(Mu \address) { nqp::box_i(nqp::unbox_i(address), self) }
+    method from(Mu \obj) { nqp::nativecallcast(VMPtr, VMPtr, nqp::decont(obj)) }
+    method gist { "VMPtr|{ nqp::unbox_i(self) }" }
     method perl { "VMPtr.from({ nqp::unbox_i(self) })" }
 }
 
@@ -207,15 +207,17 @@ multi cinvoke(Str $name, Signature $sig, *@args, Str :$lib) {
     cbind($name, $sig, :$lib).(|@args);
 }
 
-my role CPtr[::T = Void] is export {
-    has $.raw is box_target;
+my role CPtr[::T = void] is export {
+    has $.raw; # is box_target -- ???
 
     method CT-SIZEOF { PTRSIZE }
     method CT-TYPEOF { 'cpointer' }
     method CT-UNBOX { $!raw }
 
-    method from(\obj) { self.new(raw => VMPtr.from(obj)) }
+    multi method from(Int \address) { self.new(raw => VMPtr.new(address)) }
+    multi method from(Mu \obj) { self.new(raw => VMPtr.from(obj)) }
     method Int { nqp::unbox_i($!raw) }
+    method Numeric { self.Int }
     method hex { "0x{ self.Int.base(16).lc }" }
     method gist { "({ T.^name }*){ self.hex }" }
     method to(Mu:U \type) { CPtr[type].new(:$!raw) }
@@ -307,7 +309,7 @@ my role BoxedArray[::T, UInt \elems] does Positional[T] {
 }
 
 my role RawArray[::T] {
-    method box($raw: uint $elems) { BoxedArray[T, $elems].new(:$raw) }
+    method box($raw: uint \elems) { BoxedArray[T, elems].new(:$raw) }
 }
 
 my role IntegerArray[::T] does RawArray[T] {
