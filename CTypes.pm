@@ -14,24 +14,20 @@ proto ceval(Mu:D $_, *%_) is export { .?CEVAL(|%_) // {*} }
 
 proto cdecl(Mu:U $_, Str $name = '', *%_) is export { .?CDECL($name, |%_) // {*} }
 proto crawarraytype(Mu:U $_, *%_) is export { .?CRAWARRAYTYPE(|%_) // {*} }
-proto cvalue(Mu:U $_, $value, *%_) is export { .?CVALUE($value, |%_) // {*} }
+proto czero(Mu:U $_, *%_) is export { .?CZERO(|%_) // {*} }
+proto cvalue(Mu:U $_, $value?, *%_) is export { .?CVALUE($value, |%_) // {*} }
+multi cvalue(Mu:U $_, *%_) { cvalue($_, czero($_), |%_) }
 proto carray(Mu:U $_, *@_, *%_) is export { .?CARRAY(@_, |%_) // {*} }
 
-# -- a dumb pointer
-my class RawPtr is repr<CPointer> {
-    method new(Mu \address) { nqp::box_i(nqp::unbox_i(address), self) }
-    method Numeric { nqp::unbox_i(self) }
-    method Int { +self }
-    method gist { "ptr|{ +self }" }
-    method perl { "RawPtr.from({ +self })" }
-}
-
-my constant cvoidptr is export = RawPtr;
-
 # -- some constants
+my class RawPtr is repr<CPointer> { ... }
+
 my constant CHAR_BIT = 8;
 my constant PTRSIZE = nqp::nativecallsizeof(RawPtr);
 my constant PTRBITS = CHAR_BIT * PTRSIZE;
+my constant cvoidptr is export = RawPtr;
+
+sub CNULL is export { once cvoidptr.new(0) }
 
 my constant INTMAP = Map.new(
     map { CHAR_BIT * nqp::nativecallsizeof($_) => .^name },
@@ -93,6 +89,7 @@ my subset CFloatX of Num is export where nn $_, 0;
 my subset CPointer of Mu is export where .REPR eq 'CPointer';
 my subset CArray of Mu is export where .REPR eq 'CArray';
 my subset VMArray of Mu is export where .REPR eq 'VMArray';
+my subset CStruct of Mu is export where .REPR eq 'CStruct';
 
 # -- numeric types
 my native cchar is Int is ctype<char> is repr<P6int> is export {}
@@ -122,13 +119,13 @@ my native cuint64 is Int is nativesize(64) is unsigned is repr<P6int> is export 
 my native cuintptr is Int is nativesize(PTRBITS) is unsigned is repr<P6int> is export {}
 
 my native cfloat is Num is ctype<float> is repr<P6num> is export {}
-my native cdouble is Num is ctype<double>  is repr<P6num> is export {}
+my native cdouble is Num is ctype<double> is repr<P6num> is export {}
 # my native cldouble is Num is ctype<longdouble>  is repr<P6num> is export {}
 
 my native cfloat32 is Num is nativesize(32) is repr<P6num> is export {}
 my native cfloat64 is Num is nativesize(64) is repr<P6num> is export {}
 
-# -- a smart pointer
+# -- pointer types
 my class void is repr<Uninstantiable> {
     method CDECL($name) { $name ?? "void $name" !! 'void' }
 }
@@ -141,12 +138,13 @@ my role BoxedPtr[::T = void] {
     method CSIZE { PTRSIZE }
     method CTYPECLASS { 'cpointer' }
     method CDECL($name) { cdecl(T, "*$name") }
-    method CEVAL { "({ cdecl($, '*') }){ +self }" }
+    method CEVAL { "({ cdecl(T, '*') }){ +self }" }
     method CUNBOX { $!raw }
+    method CRAWPTR { $!raw }
 
     multi method from(Int \address) { self.new(raw => RawPtr.new(address)) }
     multi method from(Mu \obj) { self.new(raw => crawptr(obj)) }
-    method Numeric { +self }
+    method Numeric { self.Int }
     method gist { self.CEVAL }
     method to(Mu:U \type) { BoxedPtr[type].new(:$!raw) }
     method of { T }
@@ -155,23 +153,21 @@ my role BoxedPtr[::T = void] {
 
     method rv {
         given ~T.REPR {
-            when 'CPointer' {
-                nqp::box_i(self.to(cuintptr).rv, T);
-            }
-
-            when 'P6int' {
-                nqp::nativecallcast(nqp::decont(T), Int, nqp::decont($!raw));
-            }
-
-            when 'P6num' {
-                nqp::nativecallcast(nqp::decont(T), Num, nqp::decont($!raw));
-            }
-
-            default {
-                die "Cannot dereference pointers of type { T.^name }";
-            }
+            when 'CPointer' { nqp::box_i(self.to(cuintptr).rv, T) }
+            when 'P6int' { nqp::nativecallcast(nqp::decont(T), Int, nqp::decont($!raw)) }
+            when 'P6num' { nqp::nativecallcast(nqp::decont(T), Num, nqp::decont($!raw)) }
+            default { die "Cannot dereference pointers to type { T.^name }" }
         }
     }
+}
+
+my class RawPtr {
+    method new(Mu \address) { nqp::box_i(nqp::unbox_i(address), self) }
+    method Numeric { nqp::unbox_i(self) }
+    method Int { +self }
+    method gist { "ptr|{ +self }" }
+    method perl { "RawPtr.from({ +self })" }
+    method to(Mu:U \type) { BoxedPtr[type].new(raw => self) }
 }
 
 # -- a scalar reference
@@ -306,12 +302,14 @@ my class CParameter {
 my class CSignature {
     has $.returns;
     has @.params;
+    has $.isvoid;
 
     method arity { +@!params }
 
     method from(Signature $sig) {
-        self.bless(
-            returns => cdecl($sig.returns),
+        my $isvoid = $sig.returns =:= Mu;
+        self.bless(:$isvoid,
+            returns => $isvoid ?? 'void' !! cdecl($sig.returns),
             params => $sig.params.grep(*.positional).map({
                 CParameter.new(name => .name, type => cdecl(.type));
             }),
@@ -319,8 +317,10 @@ my class CSignature {
     }
 
     method prototype($name) {
-        "{ $!returns } { $name }({ @!params ?? @!params.join(', ') !! 'void' })"
+        "{ $!returns } { $name }({ @!params ?? @!params.join(', ') !! 'void' })";
     }
+
+    method ptrcast { "({ self.prototype('(*)') })" }
 }
 
 sub csignature(Signature $s) is export { CSignature.from($s) }
@@ -331,10 +331,36 @@ proto cinvoke(Mu $, Signature $sig, *@, *%) is export {*}
 
 my class Callsite is repr<NativeCall> {}
 
-multi cbind(Str $name, Signature $sig, Str :$lib) {
-    my $argtypes := nqp::list();
-    nqp::push($argtypes, nqp::hash('type', ctypeclass(.type)))
-        for $sig.params.grep(*.positional);
+# XXX figure out what to pass as typeobj!
+
+sub rvinfo(Mu:U $type) is raw {
+    nqp::hash(
+        'type', ctypeclass($type) // 'void',
+        'typeobj', nqp::decont($type),
+    );
+}
+
+sub siginfo(Signature $sig) is raw {
+    my $siginfo := nqp::list();
+
+    for $sig.params.grep(*.positional) {
+        my $tc := ctypeclass(.type);
+        my $to := nqp::decont(.type);
+        my $arginfo := nqp::hash('type', $tc, 'typeobj', $to);
+        if $tc eq 'callback' {
+            my $cbinfo := siginfo(.sub_signature);
+            nqp::unshift($cbinfo, rvinfo(.sub_signature.returns));
+            nqp::bindkey($arginfo, 'callback_args', $cbinfo);
+        }
+        nqp::push($siginfo, $arginfo);
+    }
+
+    $siginfo;
+}
+
+multi cbind(Str $name, Signature $sig, Str :$lib, Signature :$check) {
+    $check := $sig unless defined $check;
+    my $siginfo := siginfo($sig);
 
     # only necessary for Int?
     my $rtype := do given $sig.returns {
@@ -349,13 +375,13 @@ multi cbind(Str $name, Signature $sig, Str :$lib) {
         $lib // '',
         $name,
         '', # calling convention
-        $argtypes,
-        nqp::hash('type', ctypeclass($sig.returns) // 'void'),
+        $siginfo,
+        rvinfo($sig.returns),
     );
 
     sub (|args) {
-        fail "Arguments { args.gist } do not match signature { $sig.gist }"
-            unless args ~~ $sig;
+        fail "Arguments { args.gist } do not match signature { $check.gist }"
+            unless args ~~ $check;
 
         my $args := nqp::list();
         nqp::push($args, cunbox($_))
@@ -365,8 +391,13 @@ multi cbind(Str $name, Signature $sig, Str :$lib) {
     }
 }
 
-multi cinvoke(Str $name, Signature $sig, Capture $args, Str :$lib) { cbind($name, $sig, :$lib).(|$args) }
-multi cinvoke(Str $name, Signature $sig, *@args, Str :$lib) { cbind($name, $sig, :$lib).(|@args) }
+multi cinvoke(Str $name, Signature $sig, Capture $args, Str :$lib, Signature :$check) {
+    cbind($name, $sig, :$lib, :$check).(|$args);
+}
+
+multi cinvoke(Str $name, Signature $sig, *@args, Str :$lib, Signature :$check) {
+    cbind($name, $sig, :$lib, :$check).(|@args);
+}
 
 # -- responses
 multi csize(Mu $_, *%) { nqp::nativecallsizeof($_) }
@@ -414,6 +445,8 @@ multi ctypeclass(VMArray) { 'vmarray' }
 multi ctypeclass(Blob) { 'vmarray' }
 multi ctypeclass(Str) { 'vmarray' } # -- unboxes to Blob
 
+multi ctypeclass(Callable) { 'callback' }
+
 multi ctypeclass(Mu $_, *%) { fail .^name }
 
 multi crawarraytype(CChar) { CCharArray }
@@ -448,6 +481,7 @@ multi crawarraytype(CFloat64) { CFloat64Array }
 
 multi crawarraytype(Mu $_, *%) { fail .^name }
 
+multi cunbox(CStruct $_) { fail "Cannot pass CStruct of type { .^name } by value" }
 multi cunbox(Str \value) { "{value}\0".encode }
 multi cunbox(Mu $_, *%) { $_ }
 
@@ -457,7 +491,15 @@ multi ceval(Numeric $_, *%) { .Str }
 multi ceval(CPointer $_, *%) { "(void*){ nqp::unbox_i($_) }" }
 multi ceval(Mu $_, *%) { fail .^name }
 
+# TODO
+multi cdecl(CInt, Str $name?, *%) { $name ?? "int $name" !! 'int' }
+multi cdecl(CLLong, Str $name?, *%) { $name ?? "long long $name" !! 'long long' }
+multi cdecl(CDouble, Str $name?, *%) { $name ?? "double $name" !! 'double' }
 multi cdecl(Mu $_, Str $name?, *%) { fail .^name }
+
+multi czero(Int, *%) { 0 }
+multi czero(Num, *%) { 0e0 }
+multi czero(Mu $_, *%) { fail .^name }
 
 multi cvalue(Mu:U $_, $value, *%_) {
     my $array := crawarraytype($_, |%_).new;
